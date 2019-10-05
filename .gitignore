@@ -1,1 +1,7 @@
 secrets
+.idea
+*.ipr
+*.iws
+*.iml
+tmp
+*.log
