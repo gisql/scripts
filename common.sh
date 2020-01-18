@@ -27,19 +27,26 @@ function require() {
 
 function debug() {
     if [[ "$DEBUG" == "true" ]]; then
-        echo "$*"
+        echo "$*" 1>&2
     fi
 }
 
 function info() {
-    echo "$*"
+    echo "$*" 1>&2
 }
 
 function warn() {
-    echo "WARNING $*"
+    echo "WARNING $*" 1>&2
+}
+
+function music_files() {
+    local dir=${1?input directory}
+
+    find "$(normalise_dir "$dir")" -maxdepth 1 \( -iname "*.mp3" -o -iname "*.flac" \)
 }
 
 export -f die
 export -f normalise_dir
 export -f require
 export -f debug
+export -f music_files

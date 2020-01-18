@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+#set -e
 
 export BASE=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=./common.sh
@@ -104,10 +104,34 @@ function most_common_tag() {
         awk '{first = $1; $1 = ""; print $0; }' | sed -e 's/^ *//' # -e 's/ *$//g'
 }
 
+function cuetag_dir() {
+    local album_dir=${1?Album Dir}
+    pushd "$album_dir" > /dev/null || true
+    find "$album_dir" -maxdepth 1 -name "*.cue" -type f | wc -l | grep -q '^1$' || return
+    find "$album_dir" -maxdepth 1 -name "*.flac" -type f | wc -l | grep -q '^1$' || return
+    cue=$(find "$album_dir" -maxdepth 1 -name "*.cue" -type f)
+    cuetag "$cue" "$(find "$album_dir" -maxdepth 1 -name "*.flac" -type f)"
+    popd > /dev/null || true
+}
+
+function discogs() {
+    local out=$(mktemp)
+    curl -s -X GET -G -H "Authorization: Discogs token=$DISCOGS_TOKEN" "https://api.discogs.com/database/search" "$@" > "$out"
+    local delay=1
+    while grep -Fq 'You are making requests too' "$out"; do
+        sleep "$delay"
+        curl -s -X GET -G -H "Authorization: Discogs token=$DISCOGS_TOKEN" "https://api.discogs.com/database/search" "$@" > "$out"
+        delay=$(expr "$delay" + "$delay")
+    done
+    cat "$out"
+    rm -f "$out"
+}
+
 function process_album() {
     local album_dir=${1?Album Dir}
     [[ -d ${album_dir} ]] || die "$album_dir doesn't exist"
     album_dir=$(normalise_dir "$album_dir")
+    cuetag_dir "$album_dir"
 
     local year=$(most_common_tag "$album_dir" YEAR)
     local artist=$(most_common_tag "$album_dir" ARTIST)
@@ -119,30 +143,35 @@ function process_album() {
         warn "Directory $album_dir doesn't contain any files with tags"
         return
     else
-        curl -s -X GET -G -H "Authorization: Discogs token=$DISCOGS_TOKEN" "https://api.discogs.com/database/search" \
-            -d "release_title=$album" -d "year=$year" -d "artist=$artist" -d "type=master" -d "per_page=100" |
+        discogs -d "release_title=$album" -d "year=$year" -d "artist=$artist" -d "type=master" -d "per_page=100" |
             jq . > "$album_dir/masters.json"
-
         sleep 1 ## we are throttled at 60 requests a minute
 
         if [[ $(jq -r .pagination.items < "$album_dir/masters.json") -eq 0 ]]; then
-            curl -s -X GET -G -H "Authorization: Discogs token=$DISCOGS_TOKEN" "https://api.discogs.com/database/search" \
-                -d "release_title=$album" -d "year=$year" -d "artist=$artist" -d "per_page=100" |
+            album=$(sed -e 's/ *[\[(].*[])]//g' -e 's/cd[0-9]//gi' <<< "$album")
+
+            discogs -d "release_title=$album" -d "year=$year" -d "artist=$artist" -d "type=master" -d "per_page=100" |
                 jq . > "$album_dir/masters.json"
             sleep 1 ## we are throttled at 60 requests a minute
         fi
         if [[ $(jq -r .pagination.items < "$album_dir/masters.json") -eq 0 ]]; then
-            curl -s -X GET -G -H "Authorization: Discogs token=$DISCOGS_TOKEN" "https://api.discogs.com/database/search" \
-                -d "release_title=$album" -d "artist=$artist" -d "per_page=100" |
+            discogs -d "release_title=$album" -d "year=$year" -d "artist=$artist" -d "per_page=100" |
+                jq . > "$album_dir/masters.json"
+            sleep 1 ## we are throttled at 60 requests a minute
+        fi
+        if [[ $(jq -r .pagination.items < "$album_dir/masters.json") -eq 0 ]]; then
+            discogs -d "release_title=$album" -d "artist=$artist" -d "per_page=100" |
                 jq . > "$album_dir/masters.json"
             sleep 1 ## we are throttled at 60 requests a minute
         fi
         most_owned=$(jq .results < "$album_dir/masters.json" | jq 'sort_by(-.community.have)' | jq -r .[].resource_url | head -1)
+
+        sleep 1
         curl -s "$most_owned" | jq . > "$album_dir/master-info.json"
         sleep 3 ## we are throttled at 25 requests a minute
     fi
 
-    local track_count=$(jq -r '.tracklist | length' < "$album_dir/master-info.json")
+    local track_count=$(jq -r '.tracklist | map(select(.type_ == "track")) | length' < "$album_dir/master-info.json")
     local file_count=$(music_files "$album_dir" | wc -l)
     cat << EOF > "$album_dir/master-info.txt"
 Information generated on $(date) for directory: $album_dir
@@ -153,11 +182,23 @@ File count     $file_count $(if [[ $track_count -ne $file_count ]]; then echo "W
 Album Title    $(jq -r '.title' < "$album_dir/master-info.json")
 Main Artist    $(jq -r '.artists[0].name' < "$album_dir/master-info.json")
 
-$(jq -r '.tracklist[] | "Track #\(.position)\t\(.title)"' < "$album_dir/master-info.json")
+$(jq -r '.tracklist | map(select(.type_ == "track")) | .[] | "Track #\(.position)\t\(.title)"' < "$album_dir/master-info.json")
 EOF
 }
 
+if [[ $1 == "force" ]]; then
+    FORCE=true
+    shift
+else
+    FORCE=flase
+fi
+
 MUSIC_ROOT=${1?Root directory containing music}
+
+if [[ $FORCE == true ]]; then
+    warn "All previously download info files are going to be removed from $MUSIC_ROOT"
+    find "$MUSIC_ROOT" \( -name "master-info.txt" -o -name "*.json" \) -type f -exec rm '{}' \;
+fi
 
 music_dirs "$MUSIC_ROOT" | while read -r i; do
     debug "Processing directory: $i"
