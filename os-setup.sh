@@ -35,7 +35,12 @@ sudo apt-get update
 sudo apt-get dist-upgrade
 sudo apt-get autoremove
 
+sudo apt-get purge ibus*
+
 sudo apt-get install -y vim openssh-server git default-jdk maven postgresql docker docker-compose curl
+sudo su - postgres -c 'psql -c "alter user postgres password '"'asdf1234'"';"'
+sudo su - postgres -c 'psql -c "drop database if exists create_drop;"'
+sudo su - postgres -c 'psql -c "create database create_drop;"'
 
 if hash idea 2> /dev/null; then
     echo "Idea already installed"
