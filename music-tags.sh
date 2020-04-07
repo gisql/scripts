@@ -6,7 +6,7 @@ export BASE=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=./common.sh
 . "$BASE/common.sh"
 
-require DISCOGS_TOKEN id3v2 jq mp3info metaflac
+require DISCOGS_TOKEN id3v2 jq mp3info metaflac cuetag
 
 function mp3_1_tag() {
     local tag=${1?logical tag}
