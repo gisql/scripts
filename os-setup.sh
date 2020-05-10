@@ -12,6 +12,7 @@ export BASE=$(cd "$(dirname "$0")" && pwd)
 require gsettings
 
 gsettings set org.freedesktop.ibus.panel.emoji unicode-hotkey "[]"
+gsettings set org.gnome.desktop.wm.preferences audible-bell false
 
 function clear_fs_with() {
     local mod=$1
@@ -27,6 +28,11 @@ function clear_fs_with() {
 clear_fs_with "Alt"
 clear_fs_with "Super"
 
+# other intellij bindings
+gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-left '[]'
+gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-right '[]'
+
+
 for i in $(seq 4); do
     gsettings set org.gnome.desktop.wm.keybindings "switch-to-workspace-$i" "['<Super>F$i']"
 done
@@ -38,7 +44,7 @@ sudo apt-get autoremove
 sudo apt-get purge ibus*
 
 sudo apt-get install -y vim openssh-server git default-jdk maven postgresql docker docker-compose curl
-sudo su - postgres -c 'psql -c "alter user postgres password '"'asdf1234'"';"'
+sudo su - postgres -c 'psql -c "alter user postgres password '"'asdf123'"';"'
 sudo su - postgres -c 'psql -c "drop database if exists create_drop;"'
 sudo su - postgres -c 'psql -c "create database create_drop;"'
 
@@ -52,3 +58,14 @@ else
     sudo chown "$(id -g):$(id -u)" idea*
     sudo update-alternatives --install /usr/local/bin/idea idea /opt/idea*/bin/idea.sh 1
 fi
+
+
+########################
+
+sudo snap install spotify
+sudo apt-get install -y vlc inkscape octave mypaint kira
+
+
+################ VPN
+sudo apt install network-manager-l2tp network-manager-l2tp-gnome
+
