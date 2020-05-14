@@ -47,15 +47,17 @@ sudo apt-get install -y vim openssh-server git default-jdk maven postgresql dock
 sudo su - postgres -c 'psql -c "alter user postgres password '"'asdf123'"';"'
 sudo su - postgres -c 'psql -c "drop database if exists create_drop;"'
 sudo su - postgres -c 'psql -c "create database create_drop;"'
+sudo gpasswd -a "$USER" docker
+sudo service docker restart
 
 if hash idea 2> /dev/null; then
     echo "Idea already installed"
 else
-    curl -L curl -L https://download.jetbrains.com/idea/ideaIU-2019.3.4.tar.gz > /tmp/idea.tar.gz
+    curl -L curl -L  https://download-cf.jetbrains.com/idea/ideaIU-2020.1.1.tar.gz > /tmp/idea.tar.gz
     cd /opt || exit 1
-    rm -rf idea*
+    sudo rm -rf idea*
     sudo tar xfz /tmp/idea.tar.gz
-    sudo chown "$(id -g):$(id -u)" idea*
+    sudo chown -R "$(id -g):$(id -u)" idea*
     sudo update-alternatives --install /usr/local/bin/idea idea /opt/idea*/bin/idea.sh 1
 fi
 
@@ -63,9 +65,34 @@ fi
 ########################
 
 sudo snap install spotify
-sudo apt-get install -y vlc inkscape octave mypaint kira
+sudo apt-get install -y vlc inkscape octave mypaint kira fonts-symbola
 
 
 ################ VPN
 sudo apt install network-manager-l2tp network-manager-l2tp-gnome
+
+## Config files (in home directory -- not as root)
+cat <<EOF > ~/.vimrc
+set noshowmode
+set noruler
+set bs=0
+set noincsearch
+set nohlsearch
+set ai
+set formatoptions=tcqn21
+EOF
+
+cat <<EOF > ~/.gitconfig
+[user]
+        name = Michal Ostapowicz
+        email = ostapowicz.m@gmail.com
+[alias]
+        co = checkout
+        br = branch
+        ci = commit
+        st = status
+        last = log -1 HEAD
+[push]
+        default = simple
+EOF
 
